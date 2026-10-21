@@ -1,0 +1,53 @@
+
+name: Zarinpal Connectivity Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  connectivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Test Zarinpal HTTPS endpoints
+        shell: bash
+        run: |
+          set +e
+          reachable=0
+
+          for url in \
+            "https://payment.zarinpal.com/pg/v4/payment/request.json" \
+            "https://sandbox.zarinpal.com/pg/v4/payment/request.json" \
+            "https://api.zarinpal.com/pg/v4/payment/request.json"
+          do
+            echo
+            echo "===== Testing endpoint ====="
+            echo "$url"
+
+            result=$(curl -sS \
+              -o /dev/null \
+              --connect-timeout 8 \
+              --max-time 15 \
+              -w 'HTTP_STATUS=%{http_code} TLS_VERIFY=%{ssl_verify_result}\n' \
+              "$url" 2>&1)
+
+            rc=$?
+            printf '%s\n' "$result"
+            echo "CURL_EXIT=$rc"
+
+            if [ "$rc" -eq 0 ]; then
+              reachable=1
+            fi
+          done
+
+          if [ "$reachable" -ne 1 ]; then
+            echo "RESULT: All endpoint checks failed."
+            exit 1
+          fi
+
+          echo "RESULT: At least one endpoint returned an HTTP response."
+          echo "NOTE: Connectivity only; no payment was created."
